@@ -57,6 +57,17 @@ mod propchain_analytics {
         pub risk_score: u8,
     }
 
+    /// Crowd wisdom sentiment derived from prediction markets
+    #[derive(
+        Debug, Clone, PartialEq, scale::Encode, scale::Decode, ink::storage::traits::StorageLayout,
+    )]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct MarketSentiment {
+        pub bull_volume: u128,
+        pub bear_volume: u128,
+        pub bull_bear_ratio_bips: u32, // Ratio in basis points (10000 = 100%)
+    }
+
     /// Market Report.
     #[derive(
         Debug, Clone, PartialEq, scale::Encode, scale::Decode, ink::storage::traits::StorageLayout,
@@ -66,6 +77,7 @@ mod propchain_analytics {
         pub generated_at: u64,
         pub metrics: MarketMetrics,
         pub trend: MarketTrend,
+        pub sentiment: MarketSentiment,
         pub insights: String,
     }
 
@@ -79,6 +91,10 @@ mod propchain_analytics {
         historical_trends: ink::storage::Mapping<u64, MarketTrend>,
         /// Trend count
         trend_count: u64,
+        /// Sentiments per property
+        property_sentiments: ink::storage::Mapping<u64, MarketSentiment>,
+        /// Overall aggregated sentiment
+        overall_sentiment: MarketSentiment,
     }
 
     impl AnalyticsDashboard {
@@ -94,6 +110,12 @@ mod propchain_analytics {
                 },
                 historical_trends: ink::storage::Mapping::default(),
                 trend_count: 0,
+                property_sentiments: ink::storage::Mapping::default(),
+                overall_sentiment: MarketSentiment {
+                    bull_volume: 0,
+                    bear_volume: 0,
+                    bull_bear_ratio_bips: 5000,
+                },
             }
         }
 
@@ -162,9 +184,45 @@ mod propchain_analytics {
                 generated_at: self.env().block_timestamp(),
                 metrics: self.current_metrics.clone(),
                 trend: latest_trend,
+                sentiment: self.overall_sentiment.clone(),
                 insights: String::from(
                     "Market is relatively stable. Gas optimization is recommended.",
                 ),
+            }
+        }
+
+        /// Update market sentiment from prediction markets
+        #[ink(message)]
+        pub fn update_market_sentiment(
+            &mut self,
+            property_id: u64,
+            bull_volume: u128,
+            bear_volume: u128,
+        ) {
+            self.ensure_admin(); // Prediction market or admin updates this
+            
+            let total_volume = bull_volume + bear_volume;
+            let ratio = if total_volume > 0 {
+                ((bull_volume * 10000) / total_volume) as u32
+            } else {
+                5000 // default unbiased
+            };
+
+            let new_sentiment = MarketSentiment {
+                bull_volume,
+                bear_volume,
+                bull_bear_ratio_bips: ratio,
+            };
+
+            self.property_sentiments.insert(property_id, &new_sentiment);
+            
+            // Update overall recursively or by moving average
+            self.overall_sentiment.bull_volume = self.overall_sentiment.bull_volume.saturating_add(bull_volume);
+            self.overall_sentiment.bear_volume = self.overall_sentiment.bear_volume.saturating_add(bear_volume);
+            
+            let total_overall = self.overall_sentiment.bull_volume + self.overall_sentiment.bear_volume;
+            if total_overall > 0 {
+                self.overall_sentiment.bull_bear_ratio_bips = ((self.overall_sentiment.bull_volume * 10000) / total_overall) as u32;
             }
         }
 
@@ -227,6 +285,7 @@ mod propchain_analytics {
             let contract = AnalyticsDashboard::new();
             let report = contract.generate_market_report();
             assert_eq!(report.metrics.average_price, 0);
+            assert_eq!(report.sentiment.bull_bear_ratio_bips, 5000);
             assert!(report.insights.contains("Gas optimization"));
         }
     }
