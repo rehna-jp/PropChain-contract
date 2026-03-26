@@ -163,6 +163,24 @@ mod propchain_contracts {
         pub created_at: u64,
     }
 
+    /// Health status information for monitoring
+    #[derive(
+        Debug, Clone, PartialEq, scale::Encode, scale::Decode, ink::storage::traits::StorageLayout,
+    )]
+    #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
+    pub struct HealthStatus {
+        pub is_healthy: bool,
+        pub is_paused: bool,
+        pub contract_version: u32,
+        pub property_count: u64,
+        pub escrow_count: u64,
+        pub has_oracle: bool,
+        pub has_compliance_registry: bool,
+        pub has_fee_manager: bool,
+        pub block_number: u32,
+        pub timestamp: u64,
+    }
+
     /// Global analytics data
     #[derive(
         Debug, Clone, PartialEq, scale::Encode, scale::Decode, ink::storage::traits::StorageLayout,
@@ -817,6 +835,38 @@ mod propchain_contracts {
         #[ink(message)]
         pub fn admin(&self) -> AccountId {
             self.admin
+        }
+
+        /// Returns the full health status of the contract for monitoring
+        #[ink(message)]
+        pub fn health_check(&self) -> HealthStatus {
+            let is_paused = self.pause_info.paused;
+            HealthStatus {
+                is_healthy: !is_paused,
+                is_paused,
+                contract_version: self.version,
+                property_count: self.property_count,
+                escrow_count: self.escrow_count,
+                has_oracle: self.oracle.is_some(),
+                has_compliance_registry: self.compliance_registry.is_some(),
+                has_fee_manager: self.fee_manager.is_some(),
+                block_number: self.env().block_number(),
+                timestamp: self.env().block_timestamp(),
+            }
+        }
+
+        /// Simple liveness check that returns true if the contract is responsive
+        #[ink(message)]
+        pub fn ping(&self) -> bool {
+            true
+        }
+
+        /// Returns true if all critical dependencies (oracle, compliance, fees) are configured
+        #[ink(message)]
+        pub fn dependencies_healthy(&self) -> bool {
+            self.oracle.is_some()
+                && self.compliance_registry.is_some()
+                && self.fee_manager.is_some()
         }
 
         /// Set the oracle contract address
