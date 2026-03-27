@@ -1,5 +1,4 @@
-# Rust formatting configuration for PropChain Smart Contracts
-# Reviewed: March 2026 — see docs/code-style-guide.md for rationale.
+# Rust formatting configuration
 max_width = 100
 hard_tabs = false
 tab_spaces = 4
