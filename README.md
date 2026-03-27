@@ -87,7 +87,14 @@ cargo test                 # Run all tests including integration
 ./scripts/test.sh                      # Run all tests
 ./scripts/test.sh --coverage           # Run with coverage
 ./scripts/e2e-test.sh                  # Run E2E tests
+
+# Load Testing (Performance Validation)
+./scripts/load_test.sh                 # Run full load test suite
+cargo test --package propchain-tests load_test_concurrent_registration_light --release  # Quick validation
+cargo test --package propchain-tests stress_test_mass_registration --release  # Stress test
 ```
+
+For comprehensive load testing documentation, see [Load Testing Guide](docs/LOAD_TESTING_GUIDE.md).
 
 ## 🌐 Network Configuration
 
