@@ -76,7 +76,7 @@ impl ContractError for OracleError {
             OracleError::InsufficientReputation => oracle_codes::ORACLE_INSUFFICIENT_REPUTATION,
             OracleError::SourceAlreadyExists => oracle_codes::ORACLE_SOURCE_ALREADY_EXISTS,
             OracleError::RequestPending => oracle_codes::ORACLE_REQUEST_PENDING,
-            OracleError::BatchSizeExceeded => 4012,
+            OracleError::BatchSizeExceeded => oracle_codes::ORACLE_BATCH_SIZE_EXCEEDED,
         }
     }
 
@@ -106,6 +106,9 @@ impl ContractError for OracleError {
             }
             OracleError::RequestPending => {
                 "A valuation request for this property is already pending"
+            }
+            OracleError::BatchSizeExceeded => {
+                "The number of requested items exceeds the configured batch limit"
             }
         }
     }

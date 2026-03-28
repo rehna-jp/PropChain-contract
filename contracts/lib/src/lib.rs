@@ -6,6 +6,9 @@
 use ink::prelude::string::String;
 use ink::prelude::vec::Vec;
 use ink::storage::Mapping;
+use propchain_traits::access_control::{
+    AccessControl, Action, Permission, PermissionAuditEntry, Resource, Role,
+};
 
 // Re-export traits
 pub use propchain_traits::*;
@@ -266,7 +269,13 @@ mod propchain_contracts {
 
     /// Configuration for batch operations
     #[derive(
-        Debug, Clone, PartialEq, Eq, scale::Encode, scale::Decode, ink::storage::traits::StorageLayout,
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        scale::Encode,
+        scale::Decode,
+        ink::storage::traits::StorageLayout,
     )]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct BatchConfig {
@@ -322,7 +331,14 @@ mod propchain_contracts {
 
     /// Historical batch operation statistics (stored on-chain)
     #[derive(
-        Debug, Clone, PartialEq, Eq, Default, scale::Encode, scale::Decode, ink::storage::traits::StorageLayout,
+        Debug,
+        Clone,
+        PartialEq,
+        Eq,
+        Default,
+        scale::Encode,
+        scale::Decode,
+        ink::storage::traits::StorageLayout,
     )]
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub struct BatchOperationStats {
@@ -1794,7 +1810,6 @@ mod propchain_contracts {
             }
             self.validate_batch_size(properties.len())?;
 
-
             let caller = self.env().caller();
             let timestamp = self.env().block_timestamp();
             let total_items = properties.len() as u32;
@@ -2526,11 +2541,7 @@ mod propchain_contracts {
         }
 
         /// Updates batch operation stats and emits monitoring event.
-        fn record_batch_operation(
-            &mut self,
-            operation_code: u8,
-            metrics: &BatchMetrics,
-        ) {
+        fn record_batch_operation(&mut self, operation_code: u8, metrics: &BatchMetrics) {
             self.batch_operation_stats.total_batches_processed += 1;
             self.batch_operation_stats.total_items_processed += metrics.successful_items as u64;
             self.batch_operation_stats.total_items_failed += metrics.failed_items as u64;
@@ -3056,7 +3067,10 @@ mod propchain_contracts {
             resolution: String,
         ) -> Result<(), Error> {
             self.ensure_not_paused()?;
-            Self::validate_string_length(&resolution, propchain_traits::constants::MAX_REASON_LENGTH)?;
+            Self::validate_string_length(
+                &resolution,
+                propchain_traits::constants::MAX_REASON_LENGTH,
+            )?;
             let caller = self.env().caller();
 
             if !self.ensure_admin_rbac() {
@@ -3373,7 +3387,6 @@ mod propchain_contracts {
             }
             Ok(())
         }
-
 
         /// Validates a string field (reason, resolution) against a max length.
         fn validate_string_length(s: &str, max_len: u32) -> Result<(), Error> {

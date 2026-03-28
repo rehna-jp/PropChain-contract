@@ -8,6 +8,7 @@
 
 use ink::prelude::*;
 use ink::storage::Mapping;
+use propchain_traits::access_control::{AccessControl, Action, Permission, Resource, Role};
 use propchain_traits::*;
 
 /// Property Valuation Oracle Contract

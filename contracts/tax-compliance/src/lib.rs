@@ -634,7 +634,8 @@ mod tax_compliance {
             let record = self
                 .tax_records
                 .get((property_id, jurisdiction.code, reporting_period));
-            let snapshot = self.build_snapshot(property_id, jurisdiction.code, &assessment, record);
+            let snapshot =
+                self.build_snapshot(property_id, jurisdiction.code, &rule, &assessment, record);
 
             self.log_audit(
                 property_id,
