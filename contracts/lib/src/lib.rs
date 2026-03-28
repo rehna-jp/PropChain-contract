@@ -1847,9 +1847,15 @@ mod propchain_contracts {
             transfers: Vec<(u64, AccountId)>,
         ) -> Result<(), Error> {
             self.ensure_not_paused()?;
+            self.validate_batch_size(transfers.len())?;
+
+            if transfers.is_empty() {
+                return Ok(());
+            }
+
             let caller = self.env().caller();
 
-            // Validate all properties first to avoid partial transfers
+            // Phase 1: Validate all transfers (atomic)
             for (property_id, _) in &transfers {
                 let property = self
                     .properties
@@ -1862,58 +1868,63 @@ mod propchain_contracts {
                 }
             }
 
-            // Perform all transfers
-            let mut transferred_property_ids = Vec::new();
+            // Phase 2: Group by from-owner and to-owner for batched writes
+            let transfer_ids: Vec<u64> = transfers.iter().map(|(id, _)| *id).collect();
+
+            // Remove all transferred properties from caller's list in one pass
+            let mut from_props = self.owner_properties.get(caller).unwrap_or_default();
+            from_props.retain(|id| !transfer_ids.contains(id));
+            self.owner_properties.insert(caller, &from_props);
+
+            // Group additions by recipient to minimize writes
+            let mut recipient_additions: Vec<(AccountId, Vec<u64>)> = Vec::new();
+
             for (property_id, to) in &transfers {
                 let mut property = self
                     .properties
                     .get(property_id)
                     .ok_or(Error::PropertyNotFound)?;
-                let from = property.owner;
 
-                // Remove from current owner's properties
-                let mut current_owner_props = self.owner_properties.get(from).unwrap_or_default();
-                current_owner_props.retain(|&id| id != *property_id);
-                self.owner_properties.insert(from, &current_owner_props);
-
-                // Add to new owner's properties
-                let mut new_owner_props = self.owner_properties.get(to).unwrap_or_default();
-                new_owner_props.push(*property_id);
-                self.owner_properties.insert(to, &new_owner_props);
-
-                // Update property owner
                 property.owner = *to;
                 self.properties.insert(property_id, &property);
-                // Optimized: Update reverse mapping
                 self.property_owners.insert(property_id, to);
-
-                // Clear approval
                 self.approvals.remove(property_id);
-                transferred_property_ids.push(*property_id);
+
+                // Accumulate by recipient
+                if let Some(entry) = recipient_additions.iter_mut().find(|(addr, _)| addr == to) {
+                    entry.1.push(*property_id);
+                } else {
+                    recipient_additions.push((*to, vec![*property_id]));
+                }
             }
 
-            // Emit enhanced batch transfer to multiple recipients event
-            if !transferred_property_ids.is_empty() {
-                let first_property = self
-                    .properties
-                    .get(transferred_property_ids[0])
-                    .ok_or(Error::PropertyNotFound)?;
-                let from = first_property.owner;
-
-                let transaction_hash: Hash = [0u8; 32].into();
-                self.env().emit_event(BatchPropertyTransferredToMultiple {
-                    from,
-                    event_version: 1,
-                    transfers: transfers.clone(),
-                    count: transfers.len() as u64,
-                    timestamp: self.env().block_timestamp(),
-                    block_number: self.env().block_number(),
-                    transaction_hash,
-                    transferred_by: caller,
-                });
+            // Batch write per recipient
+            for (recipient, new_ids) in recipient_additions {
+                let mut recipient_props = self.owner_properties.get(recipient).unwrap_or_default();
+                recipient_props.extend(new_ids);
+                self.owner_properties.insert(recipient, &recipient_props);
             }
 
-            // Track gas usage
+            // Emit event
+            let transaction_hash: Hash = [0u8; 32].into();
+            self.env().emit_event(BatchPropertyTransferredToMultiple {
+                from: caller,
+                event_version: 1,
+                transfers: transfers.clone(),
+                count: transfers.len() as u64,
+                timestamp: self.env().block_timestamp(),
+                block_number: self.env().block_number(),
+                transaction_hash,
+                transferred_by: caller,
+            });
+
+            let metrics = BatchMetrics {
+                total_items: transfers.len() as u32,
+                successful_items: transfers.len() as u32,
+                failed_items: 0,
+                early_terminated: false,
+            };
+            self.record_batch_operation(3, &metrics);
             self.track_gas_usage("batch_transfer_properties_to_multiple".as_bytes());
 
             Ok(())

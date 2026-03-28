@@ -2111,4 +2111,31 @@ mod tests {
         let prop2 = contract.get_property(ids[1]).unwrap();
         assert_eq!(prop2.metadata.location, "Prop 2");
     }
+
+    #[ink::test]
+    fn batch_transfer_to_multiple_size_guard_works() {
+        let accounts = default_accounts();
+        set_caller(accounts.alice);
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(1000);
+        let mut contract = PropertyRegistry::new();
+
+        let props = vec![
+            create_custom_metadata("Prop 1", 100, "Desc", 100000, "url"),
+            create_custom_metadata("Prop 2", 200, "Desc", 200000, "url"),
+        ];
+        let ids = contract.batch_register_properties(props).unwrap().successes;
+
+        // Set max to 1 AFTER registration
+        contract.update_batch_config(1, 1).unwrap();
+
+        let transfers = vec![
+            (ids[0], accounts.bob),
+            (ids[1], accounts.charlie),
+        ];
+
+        assert_eq!(
+            contract.batch_transfer_properties_to_multiple(transfers),
+            Err(Error::BatchSizeExceeded)
+        );
+    }
 }
