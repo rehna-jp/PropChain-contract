@@ -1752,60 +1752,91 @@ mod propchain_contracts {
         pub fn batch_update_metadata(
             &mut self,
             updates: Vec<(u64, PropertyMetadata)>,
-        ) -> Result<(), Error> {
+        ) -> Result<BatchResult, Error> {
             self.ensure_not_paused()?;
+            self.validate_batch_size(updates.len())?;
+
             let caller = self.env().caller();
+            let total_items = updates.len() as u32;
+            let mut successes = Vec::new();
+            let mut failures = Vec::new();
+            let mut early_terminated = false;
 
-            // Validate all properties first to avoid partial updates
-            for (property_id, ref metadata) in &updates {
-                let property = self
-                    .properties
-                    .get(property_id)
-                    .ok_or(Error::PropertyNotFound)?;
+            for (i, (property_id, metadata)) in updates.into_iter().enumerate() {
+                if failures.len() >= self.batch_config.max_failure_threshold as usize {
+                    early_terminated = true;
+                    break;
+                }
 
+                // Validate property exists
+                let property = match self.properties.get(property_id) {
+                    Some(p) => p,
+                    None => {
+                        failures.push(BatchItemFailure {
+                            index: i as u32,
+                            item_id: property_id,
+                            error: Error::PropertyNotFound,
+                        });
+                        continue;
+                    }
+                };
+
+                // Validate ownership
                 if property.owner != caller {
-                    return Err(Error::Unauthorized);
+                    failures.push(BatchItemFailure {
+                        index: i as u32,
+                        item_id: property_id,
+                        error: Error::Unauthorized,
+                    });
+                    continue;
                 }
 
-                // Check if metadata is valid (basic check)
+                // Validate metadata
                 if metadata.location.is_empty() {
-                    return Err(Error::InvalidMetadata);
+                    failures.push(BatchItemFailure {
+                        index: i as u32,
+                        item_id: property_id,
+                        error: Error::InvalidMetadata,
+                    });
+                    continue;
                 }
-            }
 
-            // Perform all updates
-            let mut updated_property_ids = Vec::new();
-            for (property_id, metadata) in updates {
-                let mut property = self
-                    .properties
-                    .get(property_id)
-                    .ok_or(Error::PropertyNotFound)?;
-
-                property.metadata = metadata.clone();
+                // Apply update
+                let mut property = property;
+                property.metadata = metadata;
                 self.properties.insert(property_id, &property);
-                updated_property_ids.push(property_id);
+                successes.push(property_id);
             }
 
-            // Emit enhanced batch metadata update event
-            if !updated_property_ids.is_empty() {
-                let count = updated_property_ids.len() as u64;
-
+            // Emit existing batch event for successes
+            if !successes.is_empty() {
                 let transaction_hash: Hash = [0u8; 32].into();
                 self.env().emit_event(BatchMetadataUpdated {
                     owner: caller,
                     event_version: 1,
-                    property_ids: updated_property_ids,
-                    count,
+                    property_ids: successes.clone(),
+                    count: successes.len() as u64,
                     timestamp: self.env().block_timestamp(),
                     block_number: self.env().block_number(),
                     transaction_hash,
                 });
             }
 
-            // Track gas usage
+            let metrics = BatchMetrics {
+                total_items,
+                successful_items: successes.len() as u32,
+                failed_items: failures.len() as u32,
+                early_terminated,
+            };
+
+            self.record_batch_operation(2, &metrics);
             self.track_gas_usage("batch_update_metadata".as_bytes());
 
-            Ok(())
+            Ok(BatchResult {
+                successes,
+                failures,
+                metrics,
+            })
         }
 
         /// Transfers multiple properties to different recipients

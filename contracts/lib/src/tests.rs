@@ -1177,7 +1177,8 @@ mod tests {
             ),
         ];
 
-        assert!(contract.batch_update_metadata(updates).is_ok());
+        let result = contract.batch_update_metadata(updates).unwrap();
+        assert!(result.failures.is_empty());
 
         // Verify updates
         let property1 = contract.get_property(property_ids[0]).unwrap();
@@ -1630,10 +1631,10 @@ mod tests {
             },
         )];
 
-        assert_eq!(
-            contract.batch_update_metadata(updates),
-            Err(Error::Unauthorized)
-        );
+        let result = contract.batch_update_metadata(updates).unwrap();
+        assert_eq!(result.failures.len(), 1);
+        assert_eq!(result.failures[0].error, Error::Unauthorized);
+        assert!(result.successes.is_empty());
     }
 
     #[ink::test]
@@ -1656,7 +1657,9 @@ mod tests {
 
         // Test empty batch update
         let empty_updates: Vec<(u64, PropertyMetadata)> = vec![];
-        assert!(contract.batch_update_metadata(empty_updates).is_ok());
+        let result = contract.batch_update_metadata(empty_updates).unwrap();
+        assert!(result.successes.is_empty());
+        assert!(result.failures.is_empty());
 
         // Test empty batch transfer to multiple
         let empty_multiple_transfers: Vec<(u64, AccountId)> = vec![];
@@ -2021,5 +2024,69 @@ mod tests {
         // Stats should record the early termination
         let stats = contract.get_batch_stats();
         assert_eq!(stats.total_early_terminations, 1);
+    }
+
+    #[ink::test]
+    fn batch_update_metadata_size_guard_works() {
+        let accounts = default_accounts();
+        set_caller(accounts.alice);
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(1000);
+        let mut contract = PropertyRegistry::new();
+
+        // Set max to 1
+        contract.update_batch_config(1, 1).unwrap();
+
+        let props = vec![
+            create_custom_metadata("Prop 1", 100, "Desc", 100000, "url"),
+        ];
+        let ids = contract.batch_register_properties(props).unwrap().successes;
+
+        let updates = vec![
+            (ids[0], create_custom_metadata("Updated 1", 200, "Desc", 200000, "url")),
+            (999, create_custom_metadata("Updated 2", 300, "Desc", 300000, "url")),
+        ];
+
+        assert_eq!(
+            contract.batch_update_metadata(updates),
+            Err(Error::BatchSizeExceeded)
+        );
+    }
+
+    #[ink::test]
+    fn batch_update_metadata_partial_success_works() {
+        let accounts = default_accounts();
+        set_caller(accounts.alice);
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(1000);
+        let mut contract = PropertyRegistry::new();
+
+        let props = vec![
+            create_custom_metadata("Prop 1", 100, "Desc 1", 100000, "url1"),
+            create_custom_metadata("Prop 2", 200, "Desc 2", 200000, "url2"),
+        ];
+        let ids = contract.batch_register_properties(props).unwrap().successes;
+
+        let updates = vec![
+            (ids[0], create_custom_metadata("Updated 1", 150, "Updated Desc", 150000, "url_updated")),
+            (999, create_custom_metadata("Nonexistent", 300, "Desc", 300000, "url")), // PropertyNotFound
+            (ids[1], create_custom_metadata("", 250, "Desc", 250000, "url")),          // InvalidMetadata
+        ];
+
+        let result = contract.batch_update_metadata(updates).unwrap();
+
+        assert_eq!(result.successes.len(), 1);
+        assert_eq!(result.successes[0], ids[0]);
+        assert_eq!(result.failures.len(), 2);
+        assert_eq!(result.failures[0].index, 1);
+        assert_eq!(result.failures[0].error, Error::PropertyNotFound);
+        assert_eq!(result.failures[1].index, 2);
+        assert_eq!(result.failures[1].error, Error::InvalidMetadata);
+
+        // Verify the successful update took effect
+        let prop = contract.get_property(ids[0]).unwrap();
+        assert_eq!(prop.metadata.location, "Updated 1");
+
+        // Verify the untouched property is unchanged
+        let prop2 = contract.get_property(ids[1]).unwrap();
+        assert_eq!(prop2.metadata.location, "Prop 2");
     }
 }
