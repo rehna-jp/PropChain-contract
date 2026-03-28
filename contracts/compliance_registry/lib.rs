@@ -1,4 +1,9 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
+#![allow(
+    clippy::upper_case_acronyms,
+    clippy::too_many_arguments,
+    clippy::needless_borrows_for_generic_args
+)]
 
 use propchain_traits::ComplianceChecker;
 use propchain_traits::*;
@@ -290,17 +295,39 @@ mod compliance_registry {
     impl ContractError for Error {
         fn error_code(&self) -> u32 {
             match self {
-                Error::NotAuthorized => propchain_traits::errors::compliance_codes::COMPLIANCE_UNAUTHORIZED,
-                Error::NotVerified => propchain_traits::errors::compliance_codes::COMPLIANCE_NOT_VERIFIED,
-                Error::VerificationExpired => propchain_traits::errors::compliance_codes::COMPLIANCE_EXPIRED,
-                Error::HighRisk => propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED,
-                Error::ProhibitedJurisdiction => propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED,
-                Error::AlreadyVerified => propchain_traits::errors::compliance_codes::COMPLIANCE_UNAUTHORIZED,
-                Error::ConsentNotGiven => propchain_traits::errors::compliance_codes::COMPLIANCE_NOT_VERIFIED,
-                Error::DataRetentionExpired => propchain_traits::errors::compliance_codes::COMPLIANCE_EXPIRED,
-                Error::InvalidRiskScore => propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED,
-                Error::InvalidDocumentType => propchain_traits::errors::compliance_codes::COMPLIANCE_DOCUMENT_MISSING,
-                Error::JurisdictionNotSupported => propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED,
+                Error::NotAuthorized => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_UNAUTHORIZED
+                }
+                Error::NotVerified => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_NOT_VERIFIED
+                }
+                Error::VerificationExpired => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_EXPIRED
+                }
+                Error::HighRisk => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED
+                }
+                Error::ProhibitedJurisdiction => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED
+                }
+                Error::AlreadyVerified => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_UNAUTHORIZED
+                }
+                Error::ConsentNotGiven => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_NOT_VERIFIED
+                }
+                Error::DataRetentionExpired => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_EXPIRED
+                }
+                Error::InvalidRiskScore => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED
+                }
+                Error::InvalidDocumentType => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_DOCUMENT_MISSING
+                }
+                Error::JurisdictionNotSupported => {
+                    propchain_traits::errors::compliance_codes::COMPLIANCE_CHECK_FAILED
+                }
             }
         }
 
@@ -308,7 +335,9 @@ mod compliance_registry {
             match self {
                 Error::NotAuthorized => "Caller does not have permission to perform this operation",
                 Error::NotVerified => "The user has not completed verification",
-                Error::VerificationExpired => "The user's verification has expired and needs renewal",
+                Error::VerificationExpired => {
+                    "The user's verification has expired and needs renewal"
+                }
                 Error::HighRisk => "The user has been assessed as high risk",
                 Error::ProhibitedJurisdiction => "The user's jurisdiction is prohibited",
                 Error::AlreadyVerified => "The user is already verified",
