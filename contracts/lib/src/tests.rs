@@ -1125,6 +1125,28 @@ mod tests {
     }
 
     #[ink::test]
+    fn batch_transfer_properties_size_guard_works() {
+        let accounts = default_accounts();
+        set_caller(accounts.alice);
+        ink::env::test::set_block_timestamp::<ink::env::DefaultEnvironment>(1000);
+        let mut contract = PropertyRegistry::new();
+
+        let props = vec![
+            create_custom_metadata("Prop 1", 100, "Desc", 100000, "url"),
+            create_custom_metadata("Prop 2", 200, "Desc", 200000, "url"),
+        ];
+        let ids = contract.batch_register_properties(props).unwrap().successes;
+
+        // Set max to 1 after registering
+        contract.update_batch_config(1, 1).unwrap();
+
+        assert_eq!(
+            contract.batch_transfer_properties(ids, accounts.bob),
+            Err(Error::BatchSizeExceeded)
+        );
+    }
+
+    #[ink::test]
     fn batch_update_metadata_works() {
         let accounts = default_accounts();
         set_caller(accounts.alice);
