@@ -134,6 +134,11 @@ TARGET=wasm32-unknown-unknown
 - **[🚀 Deployment Guide](./docs/deployment.md)** - Contract deployment best practices
 - **[🏗️ Architecture](./docs/architecture.md)** - Contract design and technical architecture
 
+### Frontend SDK
+- **[📦 Frontend SDK](./sdk/frontend/)** - TypeScript SDK for dApp integration
+- **[📖 Frontend SDK Guide](./docs/FRONTEND_SDK_GUIDE.md)** - Comprehensive usage guide with API reference
+- **[💻 Example React App](./sdk/frontend/examples/react-app/)** - Working Vite + React example
+
 ### Development Documentation
 - **[🛠️ Development Setup](./DEVELOPMENT.md)** - Complete development environment setup
 - **[📋 Contributing Guide](./CONTRIBUTING.md)** - How to contribute effectively
@@ -146,6 +151,12 @@ PropChain-contract/
 │   ├── 📁 lib/            # Contract logic and implementations
 │   ├── 📁 traits/         # Shared trait definitions
 │   └── 📁 tests/          # Contract unit tests
+├── 📁 sdk/                # SDK packages
+│   ├── 📁 frontend/      # TypeScript SDK for dApp integration
+│   │   ├── 📁 src/       # SDK source (types, clients, utils)
+│   │   ├── 📁 __tests__/ # Unit and integration tests
+│   │   └── 📁 examples/  # Example React application
+│   └── 📁 mobile/        # Mobile SDK (React Native, Flutter)
 ├── 📁 scripts/            # Deployment and utility scripts
 ├── 📁 tests/              # Integration and E2E tests
 ├── 📁 docs/               # Comprehensive documentation
@@ -197,6 +208,12 @@ PropChain-contract/
 - [ ] Cross-chain Bridge
 - [ ] Mobile SDK
 - [ ] Advanced Analytics
+
+### ✅ Recently Completed
+- [x] Frontend SDK with TypeScript support
+- [x] Example React frontend application
+- [x] Frontend integration testing
+- [x] Frontend SDK documentation
 
 ### 📋 Planned Features
 - [ ] Governance System

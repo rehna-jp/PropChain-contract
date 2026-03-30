@@ -4,6 +4,7 @@ mod tests {
     use crate::propchain_contracts::Error;
     use crate::propchain_contracts::PropertyRegistry;
     use ink::primitives::AccountId;
+    use propchain_traits::access_control::Role;
     use propchain_traits::*;
 
     /// Helper function to get default test accounts

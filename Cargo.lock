@@ -971,7 +971,6 @@ name = "compliance_registry"
 version = "0.1.0"
 dependencies = [
  "ink 5.1.1",
- "ink_e2e",
  "parity-scale-codec",
  "propchain-traits",
  "scale-info",
@@ -5012,11 +5011,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "propchain-database"
+name = "propchain-dex"
 version = "1.0.0"
 dependencies = [
  "ink 5.1.1",
- "ink_e2e",
  "parity-scale-codec",
  "propchain-traits",
  "scale-info",
@@ -5069,17 +5067,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "propchain-metadata"
-version = "1.0.0"
-dependencies = [
- "ink 5.1.1",
- "ink_e2e",
- "parity-scale-codec",
- "propchain-traits",
- "scale-info",
-]
-
-[[package]]
 name = "propchain-prediction-market"
 version = "1.0.0"
 dependencies = [
@@ -5091,15 +5078,6 @@ dependencies = [
 
 [[package]]
 name = "propchain-proxy"
-version = "1.0.0"
-dependencies = [
- "ink 5.1.1",
- "parity-scale-codec",
- "scale-info",
-]
-
-[[package]]
-name = "propchain-third-party"
 version = "1.0.0"
 dependencies = [
  "ink 5.1.1",
@@ -7290,7 +7268,6 @@ name = "tax-compliance"
 version = "0.1.0"
 dependencies = [
  "ink 5.1.1",
- "ink_e2e",
  "parity-scale-codec",
  "propchain-traits",
  "scale-info",

@@ -159,6 +159,16 @@ impl ContractError for MonitoringError {
     fn error_category(&self) -> ErrorCategory {
         ErrorCategory::Monitoring
     }
+
+    fn error_i18n_key(&self) -> &'static str {
+        match self {
+            MonitoringError::Unauthorized => "monitoring.unauthorized",
+            MonitoringError::ContractPaused => "monitoring.contract_paused",
+            MonitoringError::InvalidThreshold => "monitoring.invalid_threshold",
+            MonitoringError::SubscriberLimitReached => "monitoring.subscriber_limit_reached",
+            MonitoringError::SubscriberNotFound => "monitoring.subscriber_not_found",
+        }
+    }
 }
 
 /// Cross-contract interface for the monitoring system.

@@ -6,6 +6,9 @@
 use ink::prelude::string::String;
 use ink::prelude::vec::Vec;
 use ink::storage::Mapping;
+use propchain_traits::access_control::{
+    AccessControl, Action, Permission, PermissionAuditEntry, Resource, Role,
+};
 
 // Re-export traits
 pub use propchain_traits::*;

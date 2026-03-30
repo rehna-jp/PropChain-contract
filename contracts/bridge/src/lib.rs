@@ -122,6 +122,9 @@ mod bridge {
         /// Transaction verification records
         verified_transactions: Mapping<Hash, bool>,
 
+        /// Cross-chain DEX settlement intents tracked by the bridge
+        cross_chain_trades: Mapping<u64, CrossChainTradeIntent>,
+
         /// Bridge operators
         bridge_operators: Vec<AccountId>,
 
@@ -130,6 +133,9 @@ mod bridge {
 
         /// Transaction counter
         transaction_counter: u64,
+
+        /// Cross-chain trade settlement counter
+        cross_chain_trade_counter: u64,
 
         /// Admin account
         admin: AccountId,
@@ -215,9 +221,11 @@ mod bridge {
                 bridge_history: Mapping::default(),
                 chain_info: Mapping::default(),
                 verified_transactions: Mapping::default(),
+                cross_chain_trades: Mapping::default(),
                 bridge_operators: vec![caller],
                 request_counter: 0,
                 transaction_counter: 0,
+                cross_chain_trade_counter: 0,
                 admin: caller,
             };
 
@@ -533,6 +541,106 @@ mod bridge {
             self.bridge_history.get(account).unwrap_or_default()
         }
 
+        /// Quotes bridge fees for a DEX settlement.
+        #[ink(message)]
+        pub fn quote_cross_chain_trade(
+            &self,
+            destination_chain: ChainId,
+            amount_in: u128,
+        ) -> Result<BridgeFeeQuote, Error> {
+            let gas_estimate = self.estimate_bridge_gas(0, destination_chain)?;
+            let protocol_fee = amount_in / 200;
+            Ok(BridgeFeeQuote {
+                destination_chain,
+                gas_estimate,
+                protocol_fee,
+                total_fee: protocol_fee.saturating_add(gas_estimate as u128),
+            })
+        }
+
+        /// Registers a cross-chain DEX trade intent on the bridge.
+        #[ink(message)]
+        pub fn register_cross_chain_trade(
+            &mut self,
+            pair_id: u64,
+            order_id: Option<u64>,
+            destination_chain: ChainId,
+            recipient: AccountId,
+            amount_in: u128,
+            min_amount_out: u128,
+        ) -> Result<u64, Error> {
+            if self.config.emergency_pause {
+                return Err(Error::BridgePaused);
+            }
+            if !self.config.supported_chains.contains(&destination_chain) {
+                return Err(Error::InvalidChain);
+            }
+
+            self.cross_chain_trade_counter += 1;
+            let trade_id = self.cross_chain_trade_counter;
+            let quote = self.quote_cross_chain_trade(destination_chain, amount_in)?;
+            let intent = CrossChainTradeIntent {
+                trade_id,
+                pair_id,
+                order_id,
+                source_chain: self.get_current_chain_id(),
+                destination_chain,
+                trader: self.env().caller(),
+                recipient,
+                amount_in,
+                min_amount_out,
+                bridge_request_id: None,
+                bridge_fee_quote: quote,
+                status: CrossChainTradeStatus::Pending,
+                created_at: self.env().block_timestamp(),
+            };
+            self.cross_chain_trades.insert(trade_id, &intent);
+            Ok(trade_id)
+        }
+
+        /// Attaches a bridge request to a pending cross-chain trade.
+        #[ink(message)]
+        pub fn attach_bridge_request_to_trade(
+            &mut self,
+            trade_id: u64,
+            bridge_request_id: u64,
+        ) -> Result<(), Error> {
+            let caller = self.env().caller();
+            let mut trade = self
+                .cross_chain_trades
+                .get(trade_id)
+                .ok_or(Error::InvalidRequest)?;
+            if caller != trade.trader && caller != self.admin {
+                return Err(Error::Unauthorized);
+            }
+            trade.bridge_request_id = Some(bridge_request_id);
+            trade.status = CrossChainTradeStatus::BridgeRequested;
+            self.cross_chain_trades.insert(trade_id, &trade);
+            Ok(())
+        }
+
+        /// Marks a cross-chain trade settlement as complete.
+        #[ink(message)]
+        pub fn settle_cross_chain_trade(&mut self, trade_id: u64) -> Result<(), Error> {
+            let caller = self.env().caller();
+            if caller != self.admin && !self.bridge_operators.contains(&caller) {
+                return Err(Error::Unauthorized);
+            }
+            let mut trade = self
+                .cross_chain_trades
+                .get(trade_id)
+                .ok_or(Error::InvalidRequest)?;
+            trade.status = CrossChainTradeStatus::Settled;
+            self.cross_chain_trades.insert(trade_id, &trade);
+            Ok(())
+        }
+
+        /// Gets a cross-chain trade settlement intent.
+        #[ink(message)]
+        pub fn get_cross_chain_trade(&self, trade_id: u64) -> Option<CrossChainTradeIntent> {
+            self.cross_chain_trades.get(trade_id)
+        }
+
         /// Adds a bridge operator
         #[ink(message)]
         pub fn add_bridge_operator(&mut self, operator: AccountId) -> Result<(), Error> {
@@ -727,6 +835,39 @@ mod bridge {
             test::set_caller::<DefaultEnvironment>(accounts.alice); // Use default admin account
             let result = bridge.sign_bridge_request(request_id, true);
             assert!(result.is_ok());
+        }
+
+        #[ink::test]
+        fn test_cross_chain_trade_lifecycle() {
+            let mut bridge = setup_bridge();
+            let accounts = test::default_accounts::<DefaultEnvironment>();
+            test::set_caller::<DefaultEnvironment>(accounts.bob);
+
+            let trade_id = bridge
+                .register_cross_chain_trade(9, Some(7), 2, accounts.charlie, 50_000, 49_000)
+                .expect("cross-chain trade registration should succeed");
+            let trade = bridge
+                .get_cross_chain_trade(trade_id)
+                .expect("trade should be stored");
+            assert_eq!(trade.status, CrossChainTradeStatus::Pending);
+            assert_eq!(trade.destination_chain, 2);
+
+            bridge
+                .attach_bridge_request_to_trade(trade_id, 33)
+                .expect("trader can attach bridge request");
+            let attached = bridge
+                .get_cross_chain_trade(trade_id)
+                .expect("attached trade should exist");
+            assert_eq!(attached.bridge_request_id, Some(33));
+
+            test::set_caller::<DefaultEnvironment>(accounts.alice);
+            bridge
+                .settle_cross_chain_trade(trade_id)
+                .expect("admin can settle trade");
+            let settled = bridge
+                .get_cross_chain_trade(trade_id)
+                .expect("settled trade should exist");
+            assert_eq!(settled.status, CrossChainTradeStatus::Settled);
         }
     }
 }
